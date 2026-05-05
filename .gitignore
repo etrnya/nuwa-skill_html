@@ -1,0 +1,14 @@
+# Backup HTML files
+nuwa_chat - *.html
+*ver*.html
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+
+# Local config / environment
+.env

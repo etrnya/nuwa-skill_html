@@ -1,0 +1,1635 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nuwa Web Chat</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- DOMPurify for XSS Protection -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f111a;
+            --sidebar-bg: rgba(20, 24, 39, 0.85);
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --text-main: #f0f2f5;
+            --text-muted: #a0aabf;
+            --accent: #6b4cff;
+            --accent-hover: #8367ff;
+            --bot-bubble: rgba(107, 76, 255, 0.15);
+            --user-bubble: rgba(255, 255, 255, 0.1);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Glassmorphism Sidebar */
+        .sidebar {
+            width: 320px;
+            background: var(--sidebar-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+        }
+
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            background: linear-gradient(90deg, #b09fff, #6b4cff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .character-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 16px 12px;
+        }
+
+        .sidebar-search {
+            padding: 0 8px 16px 8px;
+        }
+        
+        .search-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .sidebar-search input {
+            width: 100%;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            padding: 10px 30px 10px 14px;
+            border-radius: 8px;
+            color: var(--text-main);
+            outline: none;
+            transition: border-color 0.2s;
+            font-size: 0.85rem;
+        }
+        
+        .sidebar-search input:focus {
+            border-color: var(--accent);
+        }
+
+        .search-clear {
+            position: absolute;
+            right: 12px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: bold;
+            transition: color 0.2s;
+        }
+
+        .search-clear:hover {
+            color: var(--text-main);
+        }
+
+        .tag-description {
+            margin-top: 8px;
+            padding: 8px 10px;
+            background: rgba(107, 76, 255, 0.1);
+            border-left: 3px solid var(--accent);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.85);
+            line-height: 1.4;
+        }
+        
+        .character-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 6px;
+        }
+        
+        .skill-tag {
+            background: rgba(107, 76, 255, 0.15);
+            color: #b09fff;
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid rgba(107, 76, 255, 0.3);
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+
+        .skill-tag:hover {
+            background: rgba(107, 76, 255, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .tag-dropdown-panel {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 4px;
+            background: #1a1e30;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            z-index: 100;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .tag-dropdown-title {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .sidebar-category-title {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin: 16px 0 8px 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .character-item {
+            padding: 14px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-bottom: 8px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .character-item:hover {
+            background: var(--card-bg);
+        }
+
+        .character-item.active {
+            background: var(--accent);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(107, 76, 255, 0.3);
+        }
+
+        .character-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .character-info h3 {
+            font-size: 0.95rem;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .character-info p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+
+        .character-item.active .character-info p {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .sidebar-footer {
+            padding: 16px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        /* Chat Area */
+        .chat-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            background: radial-gradient(circle at top right, #1a1e30, #0f111a);
+        }
+
+        .chat-header {
+            padding: 20px 32px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 17, 26, 0.6);
+            backdrop-filter: blur(8px);
+            z-index: 5;
+        }
+
+        .current-character h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .current-character p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .chat-history {
+            flex-grow: 1;
+            padding: 32px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .message-wrapper {
+            margin-bottom: 24px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message-wrapper.user {
+            align-items: flex-end;
+        }
+
+        .message-wrapper.bot {
+            align-items: flex-start;
+        }
+
+        .message-wrapper.system {
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .message-sender {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            padding: 0 4px;
+        }
+
+        .message-bubble {
+            max-width: 80%;
+            padding: 16px 20px;
+            border-radius: 16px;
+            line-height: 1.6;
+            font-size: 1rem;
+        }
+
+        .message-bubble.system {
+            max-width: 90%;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .message-wrapper.user .message-bubble {
+            background: var(--user-bubble);
+            border: 1px solid var(--border);
+            border-bottom-right-radius: 4px;
+        }
+
+        .message-wrapper.bot .message-bubble {
+            background: var(--bot-bubble);
+            border: 1px solid rgba(107, 76, 255, 0.3);
+            border-bottom-left-radius: 4px;
+        }
+
+        /* Markdown Styles within Bubble */
+        .message-bubble p {
+            margin-bottom: 12px;
+        }
+
+        .message-bubble p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message-bubble h1,
+        .message-bubble h2,
+        .message-bubble h3 {
+            margin: 16px 0 8px 0;
+        }
+
+        .message-bubble ul,
+        .message-bubble ol {
+            margin: 12px 0 12px 24px;
+        }
+
+        .message-bubble pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 12px 0;
+        }
+
+        .message-bubble code {
+            font-family: monospace;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .message-bubble pre code {
+            background: transparent;
+            padding: 0;
+        }
+
+        .message-bubble blockquote {
+            border-left: 4px solid var(--accent);
+            padding-left: 12px;
+            margin: 12px 0;
+            color: #d0d5e0;
+        }
+
+        /* Auto select animation */
+        .typing-indicator {
+            display: inline-flex;
+            gap: 4px;
+            align-items: center;
+            height: 24px;
+        }
+
+        .typing-indicator span {
+            width: 6px;
+            height: 6px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .typing-indicator span:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(0);
+            }
+
+            40% {
+                transform: scale(1);
+            }
+        }
+
+        .input-area {
+            padding: 24px 32px;
+            background: rgba(15, 17, 26, 0.8);
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 16px;
+            align-items: flex-end;
+        }
+
+        .input-box {
+            flex-grow: 1;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 16px;
+            min-height: 56px;
+            max-height: 200px;
+            overflow-y: auto;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 1rem;
+            resize: none;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .input-box:focus {
+            border-color: var(--accent);
+        }
+
+        .send-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            background: var(--accent);
+            border: none;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .send-btn:hover {
+            background: var(--accent-hover);
+            transform: translateY(-2px);
+        }
+
+        .send-btn:disabled {
+            background: #444;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* History Sidebar */
+        .history-sidebar {
+            border-right: none;
+            border-left: 1px solid var(--border);
+            width: 280px;
+        }
+
+        .history-item {
+            padding: 12px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .history-item:hover {
+            background: var(--card-bg);
+            border-color: var(--border);
+        }
+
+        .history-item.active {
+            background: rgba(107, 76, 255, 0.15);
+            border-color: var(--accent);
+        }
+
+        .history-item-title {
+            font-size: 0.95rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-main);
+        }
+
+        .history-item-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .history-item-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .history-item:hover .history-item-actions,
+        .history-item.active .history-item-actions {
+            opacity: 1;
+        }
+
+        .del-history-btn {
+            background: rgba(255, 76, 76, 0.1);
+            border: 1px solid rgba(255, 76, 76, 0.3);
+            color: #ff6b6b;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            transition: all 0.2s;
+        }
+
+        .del-history-btn:hover {
+            background: rgba(255, 76, 76, 0.2);
+            color: #fff;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            visibility: hidden;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .modal-box {
+            background: var(--bg-color);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            width: 90%;
+            max-width: 480px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active .modal-box {
+            transform: translateY(0);
+        }
+
+        .modal-box h2 {
+            margin-bottom: 16px;
+            font-size: 1.4rem;
+        }
+
+        .modal-box p {
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: white;
+            font-family: inherit;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: var(--accent);
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 32px;
+        }
+
+        .empty-state {
+            display: flex;
+            height: 100%;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            opacity: 0.5;
+            text-align: center;
+        }
+
+        .empty-state h1 {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+
+        .empty-state p {
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1>女媧核心</h1>
+        </div>
+        <div class="character-list" id="sidebarList">
+            <!-- Dynamically populated -->
+        </div>
+        <div class="sidebar-footer">
+            <button class="btn" onclick="openSettings()">
+                ⚙️ API 設定
+            </button>
+            <button class="btn" onclick="exportChat()">
+                📥 匯出對話 (.md)
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Chat Area -->
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="current-character" id="chatHeaderInfo">
+                <h2>系統就緒</h2>
+                <p>請先設定 API Key 並選擇角色</p>
+            </div>
+            <div class="clear-btn">
+                <button class="btn" onclick="newChat()">📝 新對話</button>
+            </div>
+        </div>
+
+        <div class="chat-history" id="chatBox">
+            <div class="empty-state">
+                <h1>✨</h1>
+                <p>選擇一個角色，或交由 AI 自動為您決策</p>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <textarea class="input-box" id="userInput" placeholder="請輸入訊息 (Shift+Enter 換行, Enter 傳送)..."
+                rows="1"></textarea>
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- History Sidebar -->
+    <div class="sidebar history-sidebar">
+        <div class="sidebar-header" style="display: flex; align-items: center; min-height: 81px;">
+            <h1 style="font-size: 1.25rem;">對話歷史</h1>
+        </div>
+        <div class="character-list" id="historyList">
+            <!-- Dynamically populated -->
+        </div>
+    </div>
+
+    <!-- API Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-box">
+            <h2>⚙️ API 設定</h2>
+            <p>本對話系統串接 Google Gemini API 來獲得 AI 回應。您的金鑰僅儲存於本機瀏覽器，不會上傳至其他伺服器。不知道怎麼申請？<a href="API-KEY-SETUP.md" target="_blank" style="color: var(--accent); text-decoration: underline;">查看 API Key 申請教學</a></p>
+            <div class="form-group">
+                <label class="form-label">Gemini API Key</label>
+                <input type="password" id="apiKeyInput" class="form-input" placeholder="AIzaSy...">
+            </div>
+            <div class="form-group">
+                <label class="form-label">預設模型 (Model)</label>
+                <input type="text" id="modelInput" class="form-input" value="gemini-2.5-flash">
+            </div>
+            <div class="form-group">
+                <label class="form-label">使用者背景資料 (User Context)</label>
+                <textarea id="userContextInput" class="form-input" rows="6" style="resize: vertical;"
+                    placeholder="例如：我的名字是彥廷、居住在台南... AI 在對話時將會參考這些背景資訊。"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeSettings()">取消</button>
+                <button class="btn btn-primary" onclick="saveSettings()">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Skills Data -->
+    <script src="./skills_data.js"></script>
+
+    <!-- Main Logic -->
+    <script>
+        const DOM = {
+            sidebarList: document.getElementById('sidebarList'),
+            chatHeaderInfo: document.getElementById('chatHeaderInfo'),
+            chatBox: document.getElementById('chatBox'),
+            userInput: document.getElementById('userInput'),
+            sendBtn: document.getElementById('sendBtn'),
+            settingsModal: document.getElementById('settingsModal'),
+            apiKeyInput: document.getElementById('apiKeyInput'),
+            modelInput: document.getElementById('modelInput'),
+            userContextInput: document.getElementById('userContextInput'),
+            historyList: document.getElementById('historyList'),
+        };
+
+        const TAG_DESCRIPTIONS = {
+            "第一性原理": "放棄所有既定假設，從不可再分的基本事實重新建構解法。",
+            "反向思考": "與其思考如何成功，不如思考如何保證失敗，然後避免它。",
+            "MECE": "將問題拆成『不重疊且完整』的分類，避免遺漏與重複。",
+            "OODA迴圈": "觀察(Observe)、定位(Orient)、決定(Decide)、行動(Act)，在動態環境中快速迭代。",
+            "戰術同理心": "透過標註對方的情緒和重述對方的話語，建立極致信任感並引導談判。",
+            "雙系統思維": "系統一是快思考(直覺)，系統二是慢思考(邏輯)。多數認知偏誤來自系統一。",
+            "物理思維": "不受現有類比影響，基於物理學最基礎的公理來推導可行性。",
+            "系統思考": "看見整體而非局部，理解變數之間的延遲回饋與動態關係。",
+            "極限效率": "質疑需求、刪除流程、簡化優化、加快週期、最後才自動化。",
+            "費曼學習法": "用小學生能聽懂的語言解釋複雜概念，發現卡點即回頭重學。",
+            "本質拆解": "不被專有名詞迷惑，直指事物的運作核心。",
+            "大白話解釋": "拒絕術語與行話，用最平易近人的比喻溝通。",
+            "長期視野": "忽略短期波動與雜訊，看準十年後必然發生的趨勢並下注。",
+            "原子習慣": "讓好習慣顯而易見、有吸引力、簡單、令人愉悅。",
+            "PDCA": "計畫(Plan)、執行(Do)、檢核(Check)、行動(Act)的品質管理循環。",
+            "逆向工作法": "從顧客需求出發，先寫新聞稿與FAQ，再回頭決定要開發什麼產品。",
+            "顧客痴狂": "與其關注競爭對手，不如把所有精力放在如何讓顧客『哇』出聲。",
+            "Day1思維": "永遠保持創業第一天的活力與危機感，拒絕大企業病。",
+            "雙向門決策": "可逆的決策(雙向門)快速做，不可逆的決策(單向門)謹慎做。",
+            "金字塔原則": "結論先行，以上統下，歸類分組，邏輯遞進。",
+            "問題樹": "將大問題像樹枝般層層拆解成可執行的子問題。",
+            "結構化思維": "把混亂的資訊放入特定的框架或矩陣中，找出關聯性。",
+            "流量池": "用極致的內容（鉤子）獲取注意力，並將其轉化為私域流量。",
+            "鉤子": "在開頭前 3 秒就緊緊抓住觀眾注意力的強烈懸念或視覺衝擊。",
+            "注意力工程": "精密計算節奏、視覺與情緒起伏，讓用戶無法停止觀看。",
+            "極致投入": "把所有資源重新投入下一步，用壓倒性的品質碾壓對手。",
+            "跨領域網格": "掌握多個學科的基礎核心模型，並將它們組合起來解決問題。",
+            "預先驗屍": "假設專案已經徹底失敗，大家坐下來反推是哪裡出了問題。",
+            "避免愚蠢": "比起追求聰明，持續避免做出愚蠢的決策能帶來更穩健的長期報酬。",
+            "槓桿": "透過資本、勞動力、程式碼或媒體，放大你的努力與產出。",
+            "複利": "在金錢、關係與知識上，長期堅持帶來指數級的爆炸性成長。",
+            "特殊知識": "無法被輕易訓練或取代的技能，通常來自你的好奇心與熱情。",
+            "長期博弈": "選擇與長期視角的人玩長期遊戲，建立深厚的信任與複利。",
+            "MVP": "最小可行產品，用最快、最便宜的方式驗證市場需求。",
+            "精實": "不做無謂的規劃與浪費，快速驗證、快速迭代。",
+            "逆向真理": "『有什麼重要事實，是極少數人同意你的？』尋找被市場忽略的真相。",
+            "壟斷": "避免競爭。創造一個獨一無二的產品，成為該領域的唯一解。",
+            "藍海戰略": "創造沒有競爭對手的全新市場空間，讓競爭變得無關緊要。",
+            "冪次法則": "少數的贏家將拿走絕大部分的報酬（80/20 法則的極端版）。",
+            "絕對真實": "打造極度透明的環境，允許任何人提出質疑，尋求最真實的答案。",
+            "機器學習思維": "把大腦當成演算法，把錯誤當成資料，不斷更新權重與邏輯。",
+            "第二序思考": "不只看行動的直接結果（第一序），更思考結果的結果（第二序）。",
+            "減法藝術": "剝除所有非必要的元素，直到事物的核心本質閃閃發光。",
+            "內在感知": "關閉外界的雜音與期待，純粹聆聽自己的直覺與共鳴。",
+            "破除制約": "打破『應該怎麼做』的行業慣例，回歸純粹的創造。",
+            "故事工程": "精準設計激勵事件、衝突、高潮與結局，引發強烈的情感共鳴。",
+            "敘事架構": "用情節驅動人物的價值轉換，讓故事具有說服力與感染力。",
+            "價值轉換": "場景的結尾必須帶來主角價值的正負向翻轉，否則場景無效。",
+            "衝突設計": "給主角一個極度渴望的目標，然後用內在、人際與外在的衝突阻擋他。",
+            "行為經濟學": "人類決策常受到潛意識與環境暗示的影響，而非純理性計算。",
+            "心理煉金術": "解決問題不一定需要改變物理現實，只需要改變心理感知。",
+            "心理感知": "透過改變體驗的方式來創造價值，而非僅依賴實質的效能提升。",
+            "框架效應": "人們的選擇會受到資訊『如何被呈現』的強烈影響。",
+            "演繹推理": "從一般原則推導出必然的具體結論，排除不可能後即為真相。",
+            "極致觀察": "看見別人沒注意到的微小細節，並將其與廣大的知識庫連結。",
+            "邏輯推演": "一步步嚴謹地建立因果關係鏈，不容許任何跳躍的假設。",
+            "排除法": "排除了所有的不可能，剩下的即使多麼難以置信，也必然是真相。",
+            "蘇格拉底提問": "不給答案，而是透過連續的反問，讓對方自己發現邏輯的破綻。",
+            "假設驗證": "先把所有陳述當作假設，尋找可以推翻它的證據。",
+            "自我反思": "認識到自己的無知，是一切智慧與探究的開端。",
+            "極簡主義": "專注並向一千件事情說『不』，只留下真正偉大的功能與設計。",
+            "產品直覺": "透過深度的同理心與品味，直覺地知道用戶想要什麼。",
+            "扭曲現實力場": "透過極度的熱情與自信，讓身邊的人相信不可能的事情是可以完成的。",
+            "用戶體驗": "從接觸的第一刻起，每一個細節都要經過精心設計與控制。",
+            "大戰略": "在開打前就確保勝利的條件已經成立。不戰而屈人之兵。",
+            "避實擊虛": "避免與敵人的主力硬碰硬，攻擊他們最脆弱、最意想不到的地方。",
+            "降維打擊": "使用高階的技術或商業模式，讓對手的優勢瞬間變得毫無意義。",
+            "安全邊際": "在預測未來時保留巨大的緩衝空間，即使出錯也不至於毀滅。",
+            "敘事套利": "利用不同市場或群體之間的資訊差與敘事落差，獲取利益。",
+            "流量變現": "將所有爭議與注意力，轉化為實質的資本與影響力。",
+            "爭議行銷": "不怕被罵，只怕被遺忘。用極端言論或行為綁架大眾的注意力。",
+            "資源整合": "利用『空手套白狼』的思維，將別人的資源包裝成自己的優勢。",
+            "反脆弱": "不只在壓力與混亂中存活，反而能從中獲益並變得更強大。",
+            "黑天鵝": "不可預測、影響巨大、且事後總能被解釋的極端罕見事件。",
+            "槓鈴策略": "大部分資源放極安全處，小部分資源押注極高風險/極高回報。",
+            "尾部風險": "機率極低但一旦發生就會導致徹底毀滅的風險，必須避免。",
+            "極端談判": "以不可預測與看似非理性的強勢姿態，迫使對手退讓。",
+            "框架控制": "在對話中主導前提與定義，誰控制了框架，誰就控制了結論。",
+            "破除常規": "無視傳統的政治正確與外交辭令，用最直接粗暴的方式直擊要害。",
+            "聲量遊戲": "用極簡、強烈且具煽動性的語言，支配媒體的版面與群眾的情緒。",
+            "價值方程式": "(夢想結果 x 成功機率) / (時間延遲 x 努力與犧牲)。",
+            "行銷": "放大市場的渴望，並讓自己成為唯一能滿足該渴望的選擇。",
+            "銷售": "在不施加壓力的情況下，幫助潛在客戶做出對他們最好的決定。",
+            "獲客模型": "建立可預測、可擴展且獲取成本低於終身價值的漏斗。",
+            "爆款思維": "拆解成功案例找出底層爆款邏輯，然後用新的題材重新包裝。",
+            "寫作": "不是在紙上寫字，而是在讀者的腦海中植入一連串精準的想法與情緒。",
+            "思維中樞": "不依賴單一模型，而是根據問題性質，動態調用最合適的思維框架。",
+            "全知視角": "抽離當下的情緒與細節，像上帝一樣俯瞰整個系統的運作。",
+            "SCAMPER": "替代、合併、調整、修改、其他用途、消除、重組的創新思考法。",
+            "深度學習": "用龐大資料與算力訓練深層神經網路，發掘隱含特徵。",
+            "AI原理": "將知識壓縮成神經網路權重，從而預測或理解複雜模式。",
+            "潛意識": "影響我們決策的巨大冰山底層，未被覺察的慾望與恐懼。",
+            "陰影整合": "直面並接納自己內心黑暗、不被社會認可的部分，以獲得完整。",
+            "原型": "存在於人類集體無意識中的普遍意象，如英雄、智者、陰影等。",
+            "心理學": "探索人類心靈、行為與潛意識動機的科學。",
+            "談判": "在雙方利益衝突的情況下，透過溝通與妥協尋求共識的過程。",
+            "極限溝通": "在生死交關或極度高壓的情況下，仍能冷靜影響對方的溝通技巧。",
+            "認知偏誤": "人類大腦在處理資訊時，系統性地偏離理性判斷的心理捷徑。",
+            "決策心理學": "研究人類在不確定性與風險下，如何做出選擇與判斷。",
+            "延遲滿足": "為了獲得更大的長期回報，願意放棄眼前的短期誘惑。",
+            "ROI": "投資報酬率。所有時間與精力的投入都必須計算回報。",
+            "上帝視角": "跳出局限，從最高維度看清整個行業與全局流動。",
+            "演算法思維": "將複雜問題拆解為清晰的輸入、處理與輸出步驟，不斷優化。",
+            "降維解析": "把極度複雜的政策與資訊，用最接地氣的話一語道破。",
+            "資訊差": "利用多數人不了解的隱藏資訊，為自己或他人創造巨大優勢。",
+            "現實主義": "拋棄不切實際的情懷，直面社會殘酷的競爭本質與利益結構。",
+            "殘酷真相": "戳破粉飾太平的謊言，揭露政治不正確但真實的社會法則。"
+        };
+
+        const AUTO_MODE_ID = 'auto-ai-select';
+        let currentSkillId = null;
+        let dialogHistory = []; // Array of {role: 'user'|'model', parts: [{text: string}]}
+        let savedChats = JSON.parse(localStorage.getItem('nuwa_saved_chats') || '[]');
+        let currentChatId = Date.now().toString();
+        let config = {
+            apiKey: localStorage.getItem('nuwa_api_key') || '',
+            model: localStorage.getItem('nuwa_api_model') || 'gemini-2.5-flash',
+            userContext: localStorage.getItem('nuwa_user_context') || ''
+        };
+
+        // Initialize configuring Marked.js with secure defaults
+        marked.setOptions({
+            gfm: true,
+            breaks: true,
+        });
+
+        function init() {
+            if (!window.NUWA_SKILLS || window.NUWA_SKILLS.length === 0) {
+                alert('找不到角色資料，請先執行 update_skills.bat 產生 skills_data.js');
+                return;
+            }
+
+            renderSidebar();
+            renderHistorySidebar();
+
+            // Textarea auto-resize
+            DOM.userInput.addEventListener('input', function () {
+                this.style.height = '56px';
+                this.style.height = (this.scrollHeight) + 'px';
+            });
+
+            // Enter to send
+            DOM.userInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+
+            // Auto-open settings if no key
+            if (!config.apiKey) {
+                openSettings();
+            } else {
+                selectSkill(AUTO_MODE_ID);
+            }
+            
+            // Populate all tags container
+            const allTagsContainer = document.getElementById('allTagsContainer');
+            if(allTagsContainer) {
+                let tagsHtml = '';
+                Object.keys(TAG_DESCRIPTIONS).forEach(tag => {
+                    tagsHtml += `<span class="skill-tag" onmousedown="searchTag('${tag}', event)">#${tag}</span>`;
+                });
+                allTagsContainer.innerHTML = tagsHtml;
+            }
+
+            // Search Input logic
+            const searchInput = document.getElementById('searchInput');
+            if(searchInput) {
+                searchInput.addEventListener('focus', function() {
+                    if (this.value.trim() === '') {
+                        document.getElementById('tagDropdownPanel').style.display = 'block';
+                    }
+                });
+
+                searchInput.addEventListener('blur', function() {
+                    document.getElementById('tagDropdownPanel').style.display = 'none';
+                });
+
+                searchInput.addEventListener('input', function() {
+                    const query = this.value.toLowerCase().trim();
+                    const items = document.querySelectorAll('.character-item[data-search]');
+                    const catHeaders = document.querySelectorAll('.sidebar-category-title');
+                    
+                    // Hide dropdown if user starts typing
+                    if (query !== '') {
+                        document.getElementById('tagDropdownPanel').style.display = 'none';
+                    } else {
+                        document.getElementById('tagDropdownPanel').style.display = 'block';
+                    }
+                    
+                    const catVisibleCount = {};
+                    catHeaders.forEach(el => catVisibleCount[el.id] = 0);
+                    
+                    // Show/hide clear button
+                    const clearBtn = document.getElementById('searchClear');
+                    if (clearBtn) {
+                        clearBtn.style.display = query.length > 0 ? 'block' : 'none';
+                    }
+
+                    // Show/hide tag description
+                    const tagDescEl = document.getElementById('tagDescription');
+                    if (tagDescEl) {
+                        if (query.startsWith('#')) {
+                            // Extract exact tag (without '#')
+                            const tagQueryRaw = this.value.trim().substring(1);
+                            if (TAG_DESCRIPTIONS[tagQueryRaw]) {
+                                tagDescEl.innerText = TAG_DESCRIPTIONS[tagQueryRaw];
+                                tagDescEl.style.display = 'block';
+                            } else {
+                                tagDescEl.style.display = 'none';
+                            }
+                        } else {
+                            tagDescEl.style.display = 'none';
+                        }
+                    }
+
+                    items.forEach(item => {
+                        const searchData = item.getAttribute('data-search');
+                        const catId = item.getAttribute('data-cat');
+                        
+                        let isMatch = false;
+                        if (query === '') {
+                            isMatch = true;
+                        } else if (query.startsWith('#')) {
+                            // Tag exact match
+                            const tagQuery = query.substring(1);
+                            isMatch = searchData.includes(tagQuery);
+                        } else {
+                            // Keyword match
+                            isMatch = searchData.includes(query);
+                        }
+                        
+                        if (isMatch) {
+                            item.style.display = 'flex';
+                            if (catId) catVisibleCount[catId]++;
+                        } else {
+                            item.style.display = 'none';
+                        }
+                    });
+                    
+                    catHeaders.forEach(el => {
+                        if (catVisibleCount[el.id] === 0) {
+                            el.style.display = 'none';
+                        } else {
+                            el.style.display = 'block';
+                        }
+                    });
+                });
+            }
+        }
+        
+        window.clearSearch = function() {
+            const input = document.getElementById('searchInput');
+            if (input) {
+                input.value = '';
+                input.dispatchEvent(new Event('input'));
+            }
+        };
+
+        window.searchTag = function(tag, event) {
+            event.stopPropagation();
+            const input = document.getElementById('searchInput');
+            if (input) {
+                input.value = '#' + tag;
+                input.dispatchEvent(new Event('input'));
+            }
+        };
+
+        function renderSidebar() {
+            let html = `
+                <div class="sidebar-search">
+                    <div class="search-input-wrapper">
+                        <input type="text" id="searchInput" placeholder="搜尋大師或 #標籤...">
+                        <span class="search-clear" id="searchClear" style="display:none;" onclick="clearSearch()">✖</span>
+                        <div class="tag-dropdown-panel" id="tagDropdownPanel" style="display:none;">
+                            <div class="tag-dropdown-title">💡 所有思維模型標籤</div>
+                            <div class="character-tags" id="allTagsContainer"></div>
+                        </div>
+                    </div>
+                    <div class="tag-description" id="tagDescription" style="display:none;"></div>
+                </div>
+                <div class="character-item" id="nav-${AUTO_MODE_ID}" onclick="selectSkill('${AUTO_MODE_ID}')">
+                    <div class="character-icon">🤖</div>
+                    <div class="character-info">
+                        <h3>AI 自動挑選</h3>
+                        <p>由 AI 決定最適合的視角</p>
+                    </div>
+                </div>
+            `;
+
+            const categories = [
+                {
+                    title: "💼 商業、投資與創業巨頭",
+                    ids: ["steve-jobs-perspective", "elon-musk-perspective", "jeff-bezos-perspective", "ray-dalio-perspective", "peter-thiel-perspective", "munger-perspective", "paul-graham-perspective", "zhang-yiming-perspective"]
+                },
+                {
+                    title: "🧠 科技、AI 與科學家",
+                    ids: ["feynman-perspective", "andrej-karpathy-perspective", "ilya-sutskever-perspective"]
+                },
+                {
+                    title: "⚖️ 人生哲學、風險與批判者",
+                    ids: ["naval-perspective", "taleb-perspective"]
+                },
+                {
+                    title: "📣 媒體、網紅與極端影響力",
+                    ids: ["mrbeast-perspective", "trump-perspective", "sun-yuchen-perspective", "zhangxuefeng-perspective"]
+                },
+                {
+                    title: "📈 頂級商業行銷與變現",
+                    ids: ["alex-hormozi-perspective", "rory-sutherland-perspective"]
+                },
+                {
+                    title: "🎨 極致藝術與發散創造力",
+                    ids: ["rick-rubin-perspective"]
+                },
+                {
+                    title: "🧠 人類認知與行為心理學",
+                    ids: ["daniel-kahneman-perspective", "carl-jung-perspective"]
+                },
+                {
+                    title: "⚙️ 生產力、習慣與系統設計",
+                    ids: ["james-clear-perspective"]
+                },
+                {
+                    title: "🛡️ 談判、博弈與人際危機處理",
+                    ids: ["chris-voss-perspective", "sun-tzu-perspective"]
+                },
+                {
+                    title: "🔍 邏輯推理與結構化解題",
+                    ids: ["mckinsey-consultant-perspective", "sherlock-holmes-perspective"]
+                },
+                {
+                    title: "📖 故事工程與敘事力",
+                    ids: ["robert-mckee-perspective"]
+                },
+                {
+                    title: "🗣️ 對話與引導 (教練模式)",
+                    ids: ["socrates-perspective"]
+                },
+                {
+                    title: "🎯 專題視角 (Theme)",
+                    ids: ["x-mastery-mentor"]
+                },
+                {
+                    title: "⚙️ 系統框架與思維中樞",
+                    ids: ["the-architect-perspective"]
+                }
+            ];
+
+            let renderedIds = new Set();
+
+            const subtitleMap = {
+                "steve-jobs-perspective": "產品極簡主義與現實扭曲視角",
+                "elon-musk-perspective": "第一性原理與極致工程思維",
+                "jeff-bezos-perspective": "顧客痴狂與 Day 1 思維",
+                "ray-dalio-perspective": "絕對真實與機器學習思維",
+                "peter-thiel-perspective": "創造壟斷與逆向真理",
+                "munger-perspective": "逆向思考與多元思維模型",
+                "paul-graham-perspective": "駭客與畫家視角、Y Combinator 創投思維",
+                "zhang-yiming-perspective": "延遲滿足與 ROI 演算法思維",
+                "feynman-perspective": "費曼學習法與拆解第一原理",
+                "andrej-karpathy-perspective": "AI 學習與神經網絡專家視角",
+                "ilya-sutskever-perspective": "OpenAI 共同創辦人信念視角",
+                "naval-perspective": "財富自由與複利人生哲學",
+                "taleb-perspective": "反脆弱與黑天鵝風險視角",
+                "mrbeast-perspective": "頂級注意力工程與內容迭代邏輯",
+                "trump-perspective": "媒體聲量操作與強勢談判視角",
+                "sun-yuchen-perspective": "流量收割與加密貨幣行銷模式",
+                "zhangxuefeng-perspective": "極致現實主義與升學/職涯規劃視角",
+                "mckinsey-consultant-perspective": "MECE 原則與金字塔解題",
+                "sherlock-holmes-perspective": "演繹推理、極致觀察與排除法",
+                "socrates-perspective": "不給答案，只用反問揭示你的盲點與假設",
+                "daniel-kahneman-perspective": "雙系統思維與認知偏誤",
+                "carl-jung-perspective": "無意識、原型與陰影整合",
+                "james-clear-perspective": "微小進步與習慣系統化",
+                "chris-voss-perspective": "戰術同理心與極限談判",
+                "sun-tzu-perspective": "戰略計算、地形優劣與降維打擊",
+                "rory-sutherland-perspective": "奧美行銷大師的行為經濟學與煉金術",
+                "rick-rubin-perspective": "靈魂製作人的減法與感知藝術",
+                "robert-mckee-perspective": "《故事的解剖》好萊塢編劇教父敘事力",
+                "alex-hormozi-perspective": "無法拒絕的 $100M 報價與價值方程式",
+                "x-mastery-mentor": "專為 X (原推特) 平台設計的爆款思維與注意力工程",
+                "the-architect-perspective": "內建 28 種跨領域神級思維模型的智囊中樞"
+            };
+
+            categories.forEach((cat, index) => {
+                let catSkills = cat.ids.map(id => window.NUWA_SKILLS.find(s => s.id === id)).filter(Boolean);
+                if (catSkills.length > 0) {
+                    html += `<div class="sidebar-category-title" id="cat-title-${index}">${cat.title}</div>`;
+                    catSkills.forEach(skill => {
+                        renderedIds.add(skill.id);
+                        const initial = skill.name ? skill.name.charAt(0).toUpperCase() : '?';
+                        const displayName = subtitleMap[skill.id] ? `${skill.name} - ${subtitleMap[skill.id]}` : skill.name;
+                        let tagsHtml = '';
+                        if (skill.tags && skill.tags.length > 0) {
+                            tagsHtml = '<div class="character-tags">';
+                            skill.tags.forEach(t => {
+                                tagsHtml += `<span class="skill-tag" onclick="searchTag('${t}', event)">#${t}</span>`;
+                            });
+                            tagsHtml += '</div>';
+                        }
+                        const searchable = `${skill.name} ${displayName} ${skill.description} ${skill.tags ? skill.tags.join(' ') : ''}`.toLowerCase();
+                        
+                        html += `
+                            <div class="character-item" id="nav-${skill.id}" onclick="selectSkill('${skill.id}')" data-search="${searchable}" data-cat="cat-title-${index}">
+                                <div class="character-icon">${initial}</div>
+                                <div class="character-info">
+                                    <h3>${displayName}</h3>
+                                    <p>${skill.description.replace(/\n'/g, ' ')}</p>
+                                    ${tagsHtml}
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+            });
+
+            const otherSkills = window.NUWA_SKILLS.filter(s => !renderedIds.has(s.id));
+            if (otherSkills.length > 0) {
+                html += `<div class="sidebar-category-title" id="cat-title-other">📌 其他視角</div>`;
+                otherSkills.forEach(skill => {
+                    const initial = skill.name ? skill.name.charAt(0).toUpperCase() : '?';
+                    const displayName = subtitleMap[skill.id] ? `${skill.name} - ${subtitleMap[skill.id]}` : skill.name;
+                    let tagsHtml = '';
+                    if (skill.tags && skill.tags.length > 0) {
+                        tagsHtml = '<div class="character-tags">';
+                        skill.tags.forEach(t => {
+                            tagsHtml += `<span class="skill-tag" onclick="searchTag('${t}', event)">#${t}</span>`;
+                        });
+                        tagsHtml += '</div>';
+                    }
+                    const searchable = `${skill.name} ${displayName} ${skill.description} ${skill.tags ? skill.tags.join(' ') : ''}`.toLowerCase();
+
+                    html += `
+                        <div class="character-item" id="nav-${skill.id}" onclick="selectSkill('${skill.id}')" data-search="${searchable}" data-cat="cat-title-other">
+                            <div class="character-icon">${initial}</div>
+                            <div class="character-info">
+                                <h3>${displayName}</h3>
+                                <p>${skill.description.replace(/\n'/g, ' ')}</p>
+                                ${tagsHtml}
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            DOM.sidebarList.innerHTML = html;
+        }
+
+        function selectSkill(id, keepHistory = false) {
+            // Remove active classes
+            document.querySelectorAll('.character-item').forEach(el => el.classList.remove('active'));
+            const activeEl = document.getElementById(`nav-${id}`);
+            if (activeEl) activeEl.classList.add('active');
+
+            currentSkillId = id;
+
+            if (!keepHistory) {
+                currentChatId = Date.now().toString();
+                dialogHistory = [];
+                DOM.chatBox.innerHTML = '<div class="message-wrapper system"><div class="message-bubble system">對話已重置</div></div>';
+            }
+
+            if (id === AUTO_MODE_ID) {
+                DOM.chatHeaderInfo.innerHTML = `
+                    <h2>🤖 AI 自動挑選</h2>
+                    <p>我會依據您的提問自動戴上最適合的面具</p>
+                `;
+            } else {
+                const skill = window.NUWA_SKILLS.find(s => s.id === id);
+                if (skill) {
+                    DOM.chatHeaderInfo.innerHTML = `
+                        <h2>${skill.name}</h2>
+                        <p>${skill.description.substring(0, 50)}...</p>
+                    `;
+                }
+            }
+
+            if (!keepHistory) {
+                renderHistorySidebar();
+            }
+        }
+
+        function newChat() {
+            currentChatId = Date.now().toString();
+            dialogHistory = [];
+            DOM.chatBox.innerHTML = '<div class="message-wrapper system"><div class="message-bubble system">對話已開始</div></div>';
+            renderHistorySidebar();
+        }
+
+        function renderHistorySidebar() {
+            if (savedChats.length === 0) {
+                DOM.historyList.innerHTML = '<div style="padding: 16px; color: var(--text-muted); font-size: 0.9rem; text-align: center;">尚未有任何對話紀錄</div>';
+                return;
+            }
+            let html = '';
+            savedChats.forEach(chat => {
+                const date = new Date(chat.timestamp).toLocaleString('zh-TW');
+                const activeClass = chat.id === currentChatId ? 'active' : '';
+                html += `
+                    <div class="history-item ${activeClass}" onclick="loadChat('${chat.id}')">
+                        <div class="history-item-title">${chat.title}</div>
+                        <div class="history-item-time">${date}</div>
+                        <div class="history-item-actions">
+                            <button class="del-history-btn" onclick="deleteChat('${chat.id}', event)">刪除</button>
+                        </div>
+                    </div>
+                `;
+            });
+            DOM.historyList.innerHTML = html;
+        }
+
+        function saveCurrentChatState() {
+            if (dialogHistory.length === 0) return;
+
+            let chatIndex = savedChats.findIndex(c => c.id === currentChatId);
+
+            let firstUserMsg = dialogHistory.find(m => m.role === 'user');
+            let title = firstUserMsg ? firstUserMsg.parts[0].text.substring(0, 30) : '新對話';
+
+            let chatData = {
+                id: currentChatId,
+                title: title,
+                timestamp: Date.now(),
+                skillId: currentSkillId,
+                history: JSON.parse(JSON.stringify(dialogHistory))
+            };
+
+            if (chatIndex >= 0) {
+                savedChats[chatIndex] = chatData;
+                // Move updated chat to the top
+                savedChats.splice(chatIndex, 1);
+                savedChats.unshift(chatData);
+            } else {
+                savedChats.unshift(chatData);
+            }
+
+            localStorage.setItem('nuwa_saved_chats', JSON.stringify(savedChats));
+            renderHistorySidebar();
+        }
+
+        function loadChat(chatId) {
+            const chat = savedChats.find(c => c.id === chatId);
+            if (!chat) return;
+
+            currentChatId = chat.id;
+            selectSkill(chat.skillId, true);
+
+            dialogHistory = JSON.parse(JSON.stringify(chat.history));
+
+            DOM.chatBox.innerHTML = '';
+            dialogHistory.forEach(msg => {
+                const role = msg.role;
+                let name = '系統';
+                let isHtml = false;
+                let text = msg.parts[0].text;
+
+                if (role === 'user') {
+                    name = '您';
+                } else if (role === 'model') {
+                    name = 'AI';
+                    if (currentSkillId !== AUTO_MODE_ID) {
+                        const s = window.NUWA_SKILLS.find(x => x.id === currentSkillId);
+                        if (s) name = s.name;
+                    }
+                    isHtml = true;
+                    text = DOMPurify.sanitize(marked.parse(text));
+                }
+
+                appendMessage(role, name, text, isHtml);
+            });
+            renderHistorySidebar();
+        }
+
+        function deleteChat(chatId, event) {
+            event.stopPropagation();
+            if (!confirm('確定刪除這筆對話紀錄？')) return;
+            savedChats = savedChats.filter(c => c.id !== chatId);
+            localStorage.setItem('nuwa_saved_chats', JSON.stringify(savedChats));
+            if (currentChatId === chatId) {
+                newChat();
+            } else {
+                renderHistorySidebar();
+            }
+        }
+
+        function appendMessage(role, name, text, isHtml = false) {
+            const wrapper = document.createElement('div');
+            wrapper.className = `message-wrapper ${role}`;
+
+            const sender = document.createElement('div');
+            sender.className = 'message-sender';
+            sender.textContent = name;
+
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+
+            if (role === 'system') {
+                wrapper.className = 'message-wrapper system';
+                bubble.className = 'message-bubble system';
+            }
+
+            if (isHtml) {
+                // Sanitize HTML before inserting to prevent XSS
+                bubble.innerHTML = DOMPurify.sanitize(text);
+            } else {
+                bubble.textContent = text;
+            }
+
+            if (role !== 'system') wrapper.appendChild(sender);
+            wrapper.appendChild(bubble);
+            DOM.chatBox.appendChild(wrapper);
+            DOM.chatBox.scrollTop = DOM.chatBox.scrollHeight;
+            return bubble; // returning bubble so we can update it if typing
+        }
+
+        async function sendMessage() {
+            const text = DOM.userInput.value.trim();
+            if (!text) return;
+            if (!config.apiKey) {
+                alert('請先點擊左下角設定 API Key');
+                openSettings();
+                return;
+            }
+
+            // UI Changes
+            appendMessage('user', '您', text, false);
+            DOM.userInput.value = '';
+            DOM.userInput.style.height = '56px';
+            DOM.sendBtn.disabled = true;
+
+            dialogHistory.push({ role: 'user', parts: [{ text: text }] });
+            saveCurrentChatState();
+
+            // Show typing indicator
+            const typingBubble = appendMessage('bot', '...', '<div class="typing-indicator"><span></span><span></span><span></span></div>', true);
+
+            try {
+                let actualSkillId = currentSkillId;
+
+                // 1. If Auto Mode, determine the character first
+                if (currentSkillId === AUTO_MODE_ID) {
+                    appendMessage('system', '系統', `🤔 正在分析需求以挑選最適合的思維框架...`, false);
+                    actualSkillId = await autoSelectCharacter(text);
+                    if (!actualSkillId) {
+                        throw new Error("無法決定角色");
+                    }
+                    const s = window.NUWA_SKILLS.find(x => x.id === actualSkillId);
+                    appendMessage('system', '系統', `🎯 AI 已將視角切換為：${s ? s.name : actualSkillId}`, false);
+                    typingBubble.parentElement.querySelector('.message-sender').textContent = s.name;
+                }
+
+                // 2. Fetch Character Data
+                const skill = window.NUWA_SKILLS.find(s => s.id === actualSkillId);
+                if (!skill) throw new Error("找不到角色資料");
+
+                // Update sender name if not auto mode
+                if (currentSkillId !== AUTO_MODE_ID) {
+                    typingBubble.parentElement.querySelector('.message-sender').textContent = skill.name;
+                }
+
+                // 3. Make the API Call to Gemini
+                // Note: Add logic to use specific model / API structure. We'll use Gemini REST API.
+                let finalSystemPrompt = skill.system_prompt;
+                if (config.userContext) {
+                    finalSystemPrompt += `\n\n### 關於使用者的背景資料 ###\n${config.userContext}\n\n### 指示 ###\n請在思考與回覆時，充分考慮上述關於使用者的背景資料。`;
+                }
+
+                // Enforce Output Format and Traditional Chinese
+                finalSystemPrompt += `\n\n### 全局輸出與語言規範 (最高優先級) ###\n1. 【語言絕對要求】：請務必、絕對要使用「繁體中文 (zh-TW)」對話，包含思考過程。絕對不可使用簡體字。\n2. 【結構化表達 - 金字塔原則】：除非使用者明確要求自由發散，否則你的所有回答必須遵循「結論先行，以上統下，歸類分組」的金字塔原則。避免長篇大論的流水帳，第一段直接給出核心結論，後續再以互相獨立互不遺漏 (MECE) 的要點進行支撐。\n3. 【案例與經驗分析 - STAR 法則】：當你在舉例、分析過往事件或拆解商業案例時，請強制使用情境 (Situation)、任務 (Task)、行動 (Action)、結果 (Result) 的模版結構來敘事，確保邏輯清晰俐落。`;
+
+
+                const payload = {
+                    system_instruction: { parts: [{ text: finalSystemPrompt }] },
+                    contents: dialogHistory,
+                    generationConfig: {
+                        temperature: 0.7,
+                    }
+                };
+
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error.message);
+                }
+
+                if (!data.candidates || data.candidates.length === 0) {
+                    if (data.promptFeedback && data.promptFeedback.blockReason) {
+                        throw new Error("AI 安全審查攔截了此請求 (原因：" + data.promptFeedback.blockReason + ")");
+                    }
+                    throw new Error("API 回傳了非預期的空結果");
+                }
+
+                const candidate = data.candidates[0];
+                if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+                    throw new Error("AI 回應被中斷或沒有內容 (結束原因：" + candidate.finishReason + ")");
+                }
+
+                const botReply = candidate.content.parts[0].text;
+                dialogHistory.push({ role: 'model', parts: [{ text: botReply }] });
+                saveCurrentChatState();
+
+                // Render Response with Markdown
+                const rawMarkup = marked.parse(botReply);
+                const safeMarkup = DOMPurify.sanitize(rawMarkup);
+                typingBubble.innerHTML = safeMarkup;
+
+            } catch (error) {
+                console.error(error);
+                typingBubble.textContent = "❌ 發生錯誤：" + error.message;
+                // Pop the user prompt if failed
+                if (dialogHistory.length > 0 && dialogHistory[dialogHistory.length - 1].role === 'user') {
+                    dialogHistory.pop();
+                }
+            } finally {
+                DOM.sendBtn.disabled = false;
+                DOM.userInput.focus();
+                DOM.chatBox.scrollTop = DOM.chatBox.scrollHeight;
+            }
+        }
+
+        async function autoSelectCharacter(userMessage) {
+            let characterListStr = window.NUWA_SKILLS.map(s => `- ID: ${s.id} | Name: ${s.name} | Desc: ${s.description.split('\n')[0].substring(0, 100)}`).join('\n');
+            const prompt = `You are a router. A user has a question. Which of these characters is best suited to answer their perspective?
+Characters:
+${characterListStr}
+
+User's input: "${userMessage}"
+
+Reply ONLY with the ID of the chosen character. Do not include markdown, explanation, or quotes.`;
+
+            const payload = {
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.1 } // Removed maxOutputTokens to prevent API cut-offs
+            };
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                const defaultId = window.NUWA_SKILLS[0].id;
+
+                if (data.error || !data.candidates || data.candidates.length === 0) {
+                    console.warn("自動選角發生例外或攔截，使用預設角色...", data);
+                    return defaultId;
+                }
+
+                const candidate = data.candidates[0];
+                if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+                    console.warn("自動選角回應異常 (結束原因：" + candidate.finishReason + ")，使用預設角色...");
+                    return defaultId;
+                }
+
+                const rawId = candidate.content.parts[0].text;
+                let bestId = defaultId;
+
+                // Robust matching: Check if any of our skilled ID is mentioned in the response
+                for (const s of window.NUWA_SKILLS) {
+                    if (rawId.includes(s.id)) {
+                        bestId = s.id;
+                        break;
+                    }
+                }
+                return bestId;
+            } catch (err) {
+                console.error("Auto router request failed:", err);
+                return window.NUWA_SKILLS[0].id; // Fallback to safe default
+            }
+        }
+
+        // Settings Modal
+        function openSettings() {
+            DOM.apiKeyInput.value = config.apiKey;
+            DOM.modelInput.value = config.model;
+            DOM.userContextInput.value = config.userContext;
+            DOM.settingsModal.classList.add('active');
+        }
+
+        function closeSettings() {
+            if (!config.apiKey) {
+                alert('警告：未設定 API Key，系統無法運作。');
+            }
+            DOM.settingsModal.classList.remove('active');
+        }
+
+        function saveSettings() {
+            config.apiKey = DOM.apiKeyInput.value.trim();
+            config.model = DOM.modelInput.value.trim() || 'gemini-2.5-flash';
+            config.userContext = DOM.userContextInput.value.trim();
+            localStorage.setItem('nuwa_api_key', config.apiKey);
+            localStorage.setItem('nuwa_api_model', config.model);
+            localStorage.setItem('nuwa_user_context', config.userContext);
+            closeSettings();
+        }
+
+        // Export feature
+        function exportChat() {
+            if (dialogHistory.length === 0) {
+                alert("目前沒有對話紀錄可匯出");
+                return;
+            }
+
+            let skillName = "Auto_Mode";
+            if (currentSkillId !== AUTO_MODE_ID) {
+                const s = window.NUWA_SKILLS.find(x => x.id === currentSkillId);
+                if (s) skillName = s.name;
+            }
+
+            let markdown = `# Nuwa Chat Export\n\n`;
+            markdown += `**角色 (Skill)**: ${skillName}\n`;
+            markdown += `**時間 (Date)**: ${new Date().toLocaleString()}\n\n---\n\n`;
+
+            dialogHistory.forEach(msg => {
+                const role = msg.role === 'user' ? '👤 您 (User)' : '🤖 角色 (AI)';
+                markdown += `### ${role}\n${msg.parts[0].text}\n\n`;
+            });
+
+            const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+            const userUrl = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = userUrl;
+            a.download = `Nuwa_Chat_${new Date().getTime()}.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(userUrl);
+        }
+
+        // Run
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+
+</html>
