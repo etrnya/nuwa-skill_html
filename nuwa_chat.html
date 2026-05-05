@@ -755,7 +755,12 @@
             </div>
             <div class="form-group">
                 <label class="form-label">預設模型 (Model)</label>
-                <input type="text" id="modelInput" class="form-input" value="gemini-2.5-flash">
+                <select id="modelInput" class="form-input">
+                    <option value="gemini-2.5-flash">gemini-2.5-flash (預設，最新快速)</option>
+                    <option value="gemini-2.5-pro">gemini-2.5-pro (最新強大)</option>
+                    <option value="gemini-1.5-flash">gemini-1.5-flash (上一代，高負載時的穩定備用)</option>
+                    <option value="gemini-1.5-pro">gemini-1.5-pro (上一代，強大備用)</option>
+                </select>
             </div>
             <div class="form-group">
                 <label class="form-label">使用者背景資料 (User Context)</label>
