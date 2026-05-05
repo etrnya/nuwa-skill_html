@@ -764,8 +764,18 @@
             </div>
             <div class="form-group">
                 <label class="form-label">使用者背景資料 (User Context)</label>
+                <details style="margin-bottom: 8px; font-size: 0.85rem; color: var(--text-muted);">
+                    <summary style="cursor: pointer; color: var(--accent); user-select: none; font-weight: 500;">💡 如何讓大師更懂你？(點擊獲取萃取提示詞)</summary>
+                    <div style="margin-top: 8px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--border); line-height: 1.5;">
+                        背景資料越詳細，AI 的視角回答會越精準。請複製下方提示詞，貼給您最常用的 AI（如 ChatGPT 或 Claude），讓它分析你們的歷史對話，再將產生的結果貼到下方的輸入框中：
+                        <div style="position: relative; margin-top: 8px;">
+                            <textarea id="copyPrompt" readonly class="form-input" style="font-size: 0.75rem; height: 100px; resize: none; background: rgba(0,0,0,0.3); color: #8a93a6; padding-right: 60px;">你的工作是瀏覽我們過去的對話，然後總結你對我的瞭解。 請勿在輸出內容中使用第一人稱代名詞 (我、我的) 和第二人稱代名詞 (你、你的)，而是改用「使用者」或中性用語，稱呼你從資料中瞭解的這個對象。 盡可能保留使用者說的每一字句，特別是指令與偏好設定。 類別 (照以下順序輸出)： 1. 使用者資訊：慣用名稱、職業、教育程度和居住地。 2. 興趣與偏好：持續積極參與的活動 (不只是擁有某個物品或購買過一次的東西)。 3. 關係：已確認的長期關係。 4. 標註日期的事件、專案與計畫：近期重大活動的記錄。 5. 指令：我明確要求你在之後遵守的規則，包括「哪些一定要做」、「哪些絕對不能做」，以及對你之前行為的更正。僅納入個人化記憶中的規則，不含對話內容。 格式： 將內容依上述類別分段。盡量引用我在提示詞說過的原話，證明你總結的各個項目。按照下列格式建立各個項目： 使用者的名字是<name>。 - 證據：使用者說「叫我<name>」。日期：[YYYY-MM-DD]。 輸出內容： - 將最終輸出摘要的格式設為文字區塊。</textarea>
+                            <button onclick="navigator.clipboard.writeText(document.getElementById('copyPrompt').value); const btn=this; btn.innerText='已複製!'; setTimeout(()=>btn.innerText='複製', 2000);" style="position: absolute; right: 8px; top: 8px; background: rgba(107, 76, 255, 0.8); color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; transition: 0.2s;">複製</button>
+                        </div>
+                    </div>
+                </details>
                 <textarea id="userContextInput" class="form-input" rows="6" style="resize: vertical;"
-                    placeholder="例如：我的名字是彥廷、居住在台南... AI 在對話時將會參考這些背景資訊。"></textarea>
+                    placeholder="請貼上 AI 為您總結的背景資料，或者手動輸入..."></textarea>
             </div>
             <div class="modal-actions">
                 <button class="btn" onclick="closeSettings()">取消</button>
